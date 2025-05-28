@@ -1,0 +1,43 @@
+# Файл: .gitignore
+# Бинарные файлы
+digital-market
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Тестовые файлы
+*.test
+*.tmp
+
+# Файлы покрытия кода
+*.out
+*.cov
+
+# Зависимости
+/vendor/
+
+# Логи
+*.log
+
+# Переменные окружения
+.env
+
+# IDE и редакторы
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Операционные системы
+.DS_Store
+Thumbs.db
+
+# Временные файлы
+tmp/
+temp/
+
+# Файлы сборки
+bin/
+build/

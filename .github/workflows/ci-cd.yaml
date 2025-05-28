@@ -1,0 +1,124 @@
+# Файл: .github/workflows/ci-cd.yaml
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: digital_market_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      redis:
+        image: redis
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.23
+    
+    - name: Install dependencies
+      run: go mod download
+    
+    - name: Run migrations
+      run: |
+        curl -L https://github.com/golang-migrate/migrate/releases/download/v4.15.2/migrate.linux-amd64.tar.gz | tar xvz
+        ./migrate -path ./migrations -database "postgres://postgres:postgres@localhost:5432/digital_market_test?sslmode=disable" up
+    
+    - name: Run tests
+      run: go test -v ./...
+      env:
+        DB_HOST: localhost
+        DB_PORT: 5432
+        DB_USER: postgres
+        DB_PASSWORD: postgres
+        DB_NAME: digital_market_test
+        DB_SSLMODE: disable
+        REDIS_HOST: localhost
+        REDIS_PORT: 6379
+        JWT_SECRET: test_secret
+    
+    - name: Build
+      run: go build -v -o digital-market ./cmd/api
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: digital-market
+        path: digital-market
+
+  deploy:
+    needs: build-and-test
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Download artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: digital-market
+    
+    - name: Setup SSH
+      uses: webfactory/ssh-agent@v0.7.0
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+    
+    - name: Build and push Docker image
+      env:
+        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+        DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+      run: |
+        docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+        docker build -t $DOCKER_USERNAME/digital-market:latest .
+        docker push $DOCKER_USERNAME/digital-market:latest
+    
+    - name: Deploy to VPS
+      env:
+        VPS_HOST: ${{ secrets.VPS_HOST }}
+        VPS_USERNAME: ${{ secrets.VPS_USERNAME }}
+        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      run: |
+        # Добавляем хост в known_hosts
+        mkdir -p ~/.ssh
+        ssh-keyscan -H $VPS_HOST >> ~/.ssh/known_hosts
+        
+        # Копируем docker-compose.yml на сервер
+        scp docker-compose.prod.yaml $VPS_USERNAME@$VPS_HOST:~/digital-market/docker-compose.yaml
+        
+        # Запускаем контейнер на сервере
+        ssh $VPS_USERNAME@$VPS_HOST << 'EOF'
+          cd ~/digital-market
+          docker pull $DOCKER_USERNAME/digital-market:latest
+          docker-compose down
+          docker-compose up -d
+          docker system prune -af
+        EOF
