@@ -4,7 +4,7 @@ module digital-market
 
 go 1.23
 
-// toolchain go1.22.2
+toolchain go1.23.0
 
 require (
 	github.com/gin-gonic/gin v1.8.2
