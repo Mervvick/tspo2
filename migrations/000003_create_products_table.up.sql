@@ -13,6 +13,6 @@ CREATE TABLE IF NOT EXISTS products (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX idx_products_slug ON products(slug);
-CREATE INDEX idx_products_category_id ON products(category_id);
-CREATE INDEX idx_products_price ON products(price);
+-- CREATE INDEX idx_products_slug ON products(slug);
+-- CREATE INDEX idx_products_category_id ON products(category_id);
+-- CREATE INDEX idx_products_price ON products(price);

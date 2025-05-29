@@ -9,5 +9,5 @@ CREATE TABLE IF NOT EXISTS categories (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX idx_categories_slug ON categories(slug);
-CREATE INDEX idx_categories_parent_id ON categories(parent_id);
+-- CREATE INDEX idx_categories_slug ON categories(slug);
+-- CREATE INDEX idx_categories_parent_id ON categories(parent_id);
